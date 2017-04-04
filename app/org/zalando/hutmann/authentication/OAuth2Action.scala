@@ -160,7 +160,6 @@ class OAuth2Action(
 
   override def invokeBlock[A](request: Request[A], block: (UserRequest[A]) => Future[Result]): Future[Result] = {
     authenticate(request).flatMap { user =>
-      implicit val context: RequestContext = request
       val userRequest = new UserRequest[A](user, request)
       if (autoReject) {
         autoRejectBehaviour(userRequest.user, block(userRequest))
@@ -176,7 +175,7 @@ class OAuth2Action(
         authenticate(requestHeader).map { user =>
 
           lazy val accumulator = Action.async[A](bodyParser) { request =>
-            val userRequest = new UserRequest[A](user, request)(request)
+            val userRequest = new UserRequest[A](user, request)
             block(userRequest)
           }(requestHeader)
 

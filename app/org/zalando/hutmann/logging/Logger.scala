@@ -5,16 +5,17 @@ import java.time.{ Duration, ZonedDateTime }
 class Logger(name: String) {
   val logger = play.api.Logger(name)
 
-  protected def createLogString(message: => String, context: Context, file: sourcecode.File, line: sourcecode.Line): String = {
+  protected def createLogString(message: => String, file: sourcecode.File, line: sourcecode.Line): String = {
+    val context = Context.getContext.getOrElse(NoContextAvailable)
     val codeContext = s"${file.value.substring(file.value.lastIndexOf("/") + 1)}:${line.value}"
     val flowDuration = Duration.between(context.contextInitializationTime, ZonedDateTime.now())
 
     val contextInfo = context match {
-      case RequestContext(requestId, Some(flowId), _, _, _) => s"${flowDuration.toMillis}ms/$codeContext/$flowId"
-      case RequestContext(requestId, None, _, _, _)         => s"${flowDuration.toMillis}ms/$codeContext/requestId_$requestId"
-      case JobContext(name, Some(flowId), _)                => s"${flowDuration.toMillis}ms/$codeContext/$flowId - $name"
-      case JobContext(name, None, _)                        => s"${flowDuration.toMillis}ms/$codeContext/$name"
-      case NoContextAvailable                               => s"$codeContext/NoContextAvailable"
+      case RequestContext(_, Some(flowId), _, _) => s"${flowDuration.toMillis}ms/$codeContext/$flowId"
+      case RequestContext(requestId, None, _, _) => s"${flowDuration.toMillis}ms/$codeContext/requestId_$requestId"
+      case JobContext(name, Some(flowId), _)     => s"${flowDuration.toMillis}ms/$codeContext/$flowId - $name"
+      case JobContext(name, None, _)             => s"${flowDuration.toMillis}ms/$codeContext/$name"
+      case NoContextAvailable                    => s"$codeContext/NoContextAvailable"
     }
 
     lazy val extraInfo = (for { (key, value) <- context.extraInfo } yield { s"$key=$value" }).mkString(",")
@@ -31,30 +32,30 @@ class Logger(name: String) {
   def isWarnEnabled: Boolean = logger.isWarnEnabled
   def isErrorEnabled: Boolean = logger.isErrorEnabled
 
-  def trace(message: => String)(implicit context: Context, file: sourcecode.File, line: sourcecode.Line): Unit =
-    logger.trace(createLogString(message, context, file, line))
-  def trace(message: => String, error: => Throwable)(implicit context: Context, file: sourcecode.File, line: sourcecode.Line): Unit =
-    logger.trace(createLogString(message, context, file, line), error)
+  def trace(message: => String)(implicit file: sourcecode.File, line: sourcecode.Line): Unit =
+    logger.trace(createLogString(message, file, line))
+  def trace(message: => String, error: => Throwable)(implicit file: sourcecode.File, line: sourcecode.Line): Unit =
+    logger.trace(createLogString(message, file, line), error)
 
-  def debug(message: => String)(implicit context: Context, file: sourcecode.File, line: sourcecode.Line): Unit =
-    logger.debug(createLogString(message, context, file, line))
-  def debug(message: => String, error: => Throwable)(implicit context: Context, file: sourcecode.File, line: sourcecode.Line): Unit =
-    logger.debug(createLogString(message, context, file, line), error)
+  def debug(message: => String)(implicit file: sourcecode.File, line: sourcecode.Line): Unit =
+    logger.debug(createLogString(message, file, line))
+  def debug(message: => String, error: => Throwable)(implicit file: sourcecode.File, line: sourcecode.Line): Unit =
+    logger.debug(createLogString(message, file, line), error)
 
-  def info(message: => String)(implicit context: Context, file: sourcecode.File, line: sourcecode.Line): Unit =
-    logger.info(createLogString(message, context, file, line))
-  def info(message: => String, error: => Throwable)(implicit context: Context, file: sourcecode.File, line: sourcecode.Line): Unit =
-    logger.info(createLogString(message, context, file, line), error)
+  def info(message: => String)(implicit file: sourcecode.File, line: sourcecode.Line): Unit =
+    logger.info(createLogString(message, file, line))
+  def info(message: => String, error: => Throwable)(implicit file: sourcecode.File, line: sourcecode.Line): Unit =
+    logger.info(createLogString(message, file, line), error)
 
-  def warn(message: => String)(implicit context: Context, file: sourcecode.File, line: sourcecode.Line): Unit =
-    logger.warn(createLogString(message, context, file, line))
-  def warn(message: => String, error: => Throwable)(implicit context: Context, file: sourcecode.File, line: sourcecode.Line): Unit =
-    logger.warn(createLogString(message, context, file, line), error)
+  def warn(message: => String)(implicit file: sourcecode.File, line: sourcecode.Line): Unit =
+    logger.warn(createLogString(message, file, line))
+  def warn(message: => String, error: => Throwable)(implicit file: sourcecode.File, line: sourcecode.Line): Unit =
+    logger.warn(createLogString(message, file, line), error)
 
-  def error(message: => String)(implicit context: Context, file: sourcecode.File, line: sourcecode.Line): Unit =
-    logger.error(createLogString(message, context, file, line))
-  def error(message: => String, error: => Throwable)(implicit context: Context, file: sourcecode.File, line: sourcecode.Line): Unit =
-    logger.error(createLogString(message, context, file, line), error)
+  def error(message: => String)(implicit file: sourcecode.File, line: sourcecode.Line): Unit =
+    logger.error(createLogString(message, file, line))
+  def error(message: => String, error: => Throwable)(implicit file: sourcecode.File, line: sourcecode.Line): Unit =
+    logger.error(createLogString(message, file, line), error)
 }
 
 /**

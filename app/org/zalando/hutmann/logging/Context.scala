@@ -2,9 +2,10 @@ package org.zalando.hutmann.logging
 
 import java.time.ZonedDateTime
 
+import org.slf4j.MDC
 import org.zalando.hutmann.authentication.{ AuthorizationProblem, NoAuthorization, User, UserRequest }
 import org.zalando.hutmann.filters.FlowIdFilter.FlowIdHeader
-import play.api.mvc.{ Request, RequestHeader }
+import play.api.mvc.RequestHeader
 
 import scala.language.implicitConversions
 
@@ -53,14 +54,12 @@ object FlowIdAware {
   * @param requestId     The play request id that is unique for a request.
   * @param flowId        The flow id that is used to identify a flow over system boundaries.
   * @param requestHeader The request headers the request has. The request body is not forwarded here since you should do that explicitly if you need it.
-  * @param user          The user that issued the request (if any).
   */
 case class RequestContext(
     requestId:              Long,
     override val flowId:    Option[String],
     requestHeader:          RequestHeader,
-    user:                   Either[AuthorizationProblem, User],
-    override val extraInfo: Map[String, String]                = Map.empty
+    override val extraInfo: Map[String, String] = Map.empty
 ) extends Context with FlowIdAware {
   override def updated(key: String, value: String): RequestContext = this.copy(extraInfo = extraInfo.updated(key, value))
 }
@@ -89,30 +88,60 @@ case class JobContext(
 }
 
 object Context {
-  /**
-    * Implicit conversion to allow easy creation of {{{Context}}}. Usage:
-    *
-    * {{{
-    * implicit val context: ContextInformation = request
-    * }}}
-    *
-    * @param request The play request object that should be used to extract information.
-    * @tparam A      The type of the body of the request.
-    */
-  implicit def request2loggingContext[A](request: UserRequest[A]): RequestContext = request.context
+  self =>
+  private val context = new ThreadLocal[Context]()
+
+  def getContext: Option[Context] = {
+    Option(context.get())
+  }
+
+  def setContext(ctx: Context): Unit = {
+    context.set(ctx)
+    setMdcContext(ctx)
+  }
+
+  def clear(): Unit = {
+    context.remove()
+    removeMdcContext()
+  }
+
+  private def setMdcContext(context: Context): Unit = {
+    context match {
+      case FlowIdAware(flowId) =>
+        MDC.put(FlowIdHeader, flowId)
+      case _ =>
+    }
+  }
+
+  private def removeMdcContext(): Unit = {
+    MDC.remove(FlowIdHeader)
+  }
+
+  def capture(): CapturedContext = new CapturedContext {
+    val maybeContext = getContext
+    def withContext[T](block: => T): T = maybeContext match {
+      case Some(ctx) => self.withContext(ctx)(block)
+      case None      => block
+    }
+  }
 
   /**
-    * Implicit conversion to allow easy creation of {{{Context}}}. Usage:
-    *
-    * {{{
-    * implicit val context: ContextInformation = request
-    * }}}
-    *
-    * @param request The play request object that should be used to extract information.
-    * @tparam A      The type of the body of the request.
+    * Execute the given block with the given context.
     */
-  implicit def request2loggingContext[A](request: Request[A]): RequestContext =
-    RequestContext(requestId = request.id, flowId = request.headers.get(FlowIdHeader), requestHeader = request, user = Left(NoAuthorization))
+  def withContext[T](ctx: Context)(block: => T) = {
+    assert(ctx != null, "Context must not be null")
+
+    val maybeOld = getContext
+    try {
+      setContext(ctx)
+      block
+    } finally {
+      maybeOld match {
+        case Some(old) => setContext(old)
+        case None      => clear()
+      }
+    }
+  }
 
   /**
     * Implicit conversion to allow easy creation of {{{Context}}}. Usage:
@@ -125,5 +154,13 @@ object Context {
     * @tparam A      The type of the body of the request.
     */
   implicit def request2loggingContext[A](request: RequestHeader): RequestContext =
-    RequestContext(requestId = request.id, flowId = request.headers.get(FlowIdHeader), requestHeader = request, user = Left(NoAuthorization))
+    RequestContext(requestId = request.id, flowId = request.headers.get(FlowIdHeader), requestHeader = request)
+}
+
+trait CapturedContext {
+
+  /**
+    * Execute the given block with the captured context.
+    */
+  def withContext[T](block: => T): T
 }
