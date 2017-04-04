@@ -128,9 +128,7 @@ object Context {
   /**
     * Execute the given block with the given context.
     */
-  def withContext[T](ctx: Context)(block: => T) = {
-    assert(ctx != null, "Context must not be null")
-
+  def withContext[T](ctx: Context)(block: => T): T = {
     val maybeOld = getContext
     try {
       setContext(ctx)
