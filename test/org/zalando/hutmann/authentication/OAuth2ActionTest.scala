@@ -7,8 +7,8 @@ import com.typesafe.config.ConfigFactory
 import org.scalacheck.{ Arbitrary, Gen, Shrink }
 import org.scalatest.prop.GeneratorDrivenPropertyChecks
 import org.scalatestplus.play.OneAppPerSuite
-import org.zalando.hutmann.logging.Context
 import org.zalando.hutmann.spec.UnitSpec
+import org.zalando.hutmann.trace.Context
 import play.api.mvc.MultipartFormData.FilePart
 import play.api.mvc.{ BodyParsers, Results }
 import play.api.test.{ FakeRequest, WsTestClient }
@@ -133,13 +133,13 @@ class OAuth2ActionTest extends UnitSpec with GeneratorDrivenPropertyChecks with 
           retVal
         }
 
-        forAll(tokenGen) { token: String =>
+        forAll(tokenGen, minSuccessful(5)) { token: String =>
           callCount = 0
           authenticate(FakeRequest("GET", s"/?access_token=$token")).futureValue
           withClue("tested if validateToken was called the correct number of times") {
             callCount shouldBe 2
           }
-        }(generatorDrivenConfig.copy(minSuccessful = 5), Shrink.shrinkAny)
+        }
       }
 
       "OAuth2" should "parse request body before authenticating" in {

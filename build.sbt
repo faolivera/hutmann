@@ -13,7 +13,7 @@ libraryDependencies ++= Seq(
 )
 
 libraryDependencies ++= Seq(
-  "org.scalatest" %% "scalatest" % "2.2.6",
+  "org.scalatest" %% "scalatest" % "3.0.1",
   "org.scalatestplus.play" %% "scalatestplus-play" % "1.5.0",
   "org.scalacheck" %% "scalacheck" % "1.12.5"
 ) map (_ % "test")
