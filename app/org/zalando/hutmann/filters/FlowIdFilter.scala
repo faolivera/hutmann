@@ -6,10 +6,11 @@ import play.api.mvc.{ Filter, RequestHeader, Result }
 import play.api.mvc.Results.BadRequest
 import play.api.libs.concurrent.Execution.Implicits.defaultContext
 import java.util.{ Base64, UUID }
+
 import akka.stream.Materializer
 import com.google.inject.Inject
 import FlowIdFilter.FlowIdHeader
-import org.zalando.hutmann.logging.Context
+import org.zalando.hutmann.trace.Context
 /**
   * A flow id filter that checks flow ids and can add them if they are not present, as well as copy them to the output
   * if needed.

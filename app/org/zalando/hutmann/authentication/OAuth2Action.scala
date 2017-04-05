@@ -6,7 +6,8 @@ import akka.stream.Materializer
 import akka.stream.scaladsl.Flow
 import akka.util.ByteString
 import com.typesafe.config.Config
-import org.zalando.hutmann.logging.{ Context, Logger, RequestContext }
+import org.zalando.hutmann.logging.Logger
+import org.zalando.hutmann.trace.{ Context, RequestContext }
 import play.api.Configuration
 import play.api.http.{ HeaderNames, MimeTypes, Status }
 import play.api.libs.streams.Accumulator

@@ -2,6 +2,8 @@ package org.zalando.hutmann.logging
 
 import java.time.{ Duration, ZonedDateTime }
 
+import org.zalando.hutmann.trace.{ Context, NoContextAvailable, RequestContext, JobContext }
+
 class Logger(name: String) {
   val logger = play.api.Logger(name)
 

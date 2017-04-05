@@ -2,7 +2,8 @@ package org.zalando.hutmann.filters
 
 import akka.stream.Materializer
 import com.google.inject.Inject
-import org.zalando.hutmann.logging.{ Context, Logger }
+import org.zalando.hutmann.logging.Logger
+import org.zalando.hutmann.trace.Context
 import play.api.http.HeaderNames
 import play.api.mvc._
 

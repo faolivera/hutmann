@@ -1,9 +1,8 @@
-package org.zalando.hutmann.logging
+package org.zalando.hutmann.trace
 
 import java.time.ZonedDateTime
 
 import org.slf4j.MDC
-import org.zalando.hutmann.authentication.{ AuthorizationProblem, NoAuthorization, User, UserRequest }
 import org.zalando.hutmann.filters.FlowIdFilter.FlowIdHeader
 import play.api.mvc.RequestHeader
 

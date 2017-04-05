@@ -1,10 +1,11 @@
-package org.zalando.hutmann.concurrent
+package org.zalando.hutmann.dispatchers
 
 import java.util.concurrent.TimeUnit
 
 import akka.dispatch._
 import com.typesafe.config.Config
-import org.zalando.hutmann.logging.Context
+import org.zalando.hutmann.trace.Context
+
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.{ Duration, FiniteDuration }
 
