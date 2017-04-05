@@ -1,7 +1,7 @@
 package org.zalando.hutmann.logging
 
-import org.zalando.hutmann.authentication.User
 import org.zalando.hutmann.spec.UnitSpec
+import org.zalando.hutmann.trace.{ Context, JobContext, RequestContext }
 import play.api.test.FakeRequest
 
 import scala.util.Random
@@ -9,7 +9,7 @@ import scala.util.Random
 class LoggerDemo extends UnitSpec {
   val logger = Logger()
 
-  def logStatements(implicit context: Context): Unit = {
+  def logStatements(): Unit = {
     logger.trace("This is a test")
     logger.debug("This is a test")
     logger.info("This is a test")
@@ -18,17 +18,20 @@ class LoggerDemo extends UnitSpec {
   }
 
   "The logger" should "be demonstrated without a context" in {
-    implicit val context: Context = NoContextAvailable
-    logStatements
+    logStatements()
   }
 
   it should "be demonstrated with a request context" in {
-    implicit val context: Context = RequestContext(Random.nextLong(), Some("abc123"), FakeRequest(), Right(User("abc", Map.empty, "realm", "Bearer", 100, None)))
-    logStatements
+    val context: Context = RequestContext(Random.nextLong(), Some("abc123"), FakeRequest())
+    Context.withContext(context) {
+      logStatements()
+    }
   }
 
   it should "be demonstrated with a job context" in {
-    implicit val context: Context = JobContext("FunnyRainbowJob", Some("abc123"))
-    logStatements
+    val context: Context = JobContext("FunnyRainbowJob", Some("abc123"))
+    Context.withContext(context) {
+      logStatements()
+    }
   }
 }
