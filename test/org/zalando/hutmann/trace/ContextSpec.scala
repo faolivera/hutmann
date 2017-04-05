@@ -95,5 +95,4 @@ class ContextSpec extends AsyncFlatSpec with Matchers with BeforeAndAfterEach {
     Context.clear()
   }
 
-  def waitValue[T](future: Future[T]): T = Await.result(future, 200 millis)
 }
