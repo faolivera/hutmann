@@ -8,7 +8,7 @@ class Logger(name: String) {
   val logger = play.api.Logger(name)
 
   protected def createLogString(message: => String, file: sourcecode.File, line: sourcecode.Line): String = {
-    val context = Context.getContext.getOrElse(NoContextAvailable)
+    val context = Context.getContext
     val codeContext = s"${file.value.substring(file.value.lastIndexOf("/") + 1)}:${line.value}"
     val flowDuration = Duration.between(context.contextInitializationTime, ZonedDateTime.now())
 

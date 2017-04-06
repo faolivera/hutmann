@@ -3,9 +3,7 @@ package org.zalando.hutmann.trace
 import org.scalatest.{ Assertion, AsyncFlatSpec, BeforeAndAfterEach, Matchers }
 import play.api.inject.guice.GuiceApplicationBuilder
 import play.api.test.FakeRequest
-
-import scala.concurrent.duration._
-import scala.concurrent.{ Await, ExecutionContext, Future }
+import scala.concurrent.{ ExecutionContext, Future }
 import scala.util.Random
 
 class ContextSpec extends AsyncFlatSpec with Matchers with BeforeAndAfterEach {
@@ -19,8 +17,7 @@ class ContextSpec extends AsyncFlatSpec with Matchers with BeforeAndAfterEach {
         Context.getContext
       }
       futureContext.map { contextOpt =>
-        contextOpt shouldBe defined
-        contextOpt shouldBe Some(context)
+        contextOpt shouldBe context
       }
     }
   }
@@ -32,25 +29,22 @@ class ContextSpec extends AsyncFlatSpec with Matchers with BeforeAndAfterEach {
     val context = RequestContext(Random.nextLong(), Some("abc123"), FakeRequest())
     Context.withContext(context) {
       val currentContext = Context.getContext
-      currentContext shouldBe defined
-      currentContext shouldBe Some(context)
+      currentContext shouldBe context
     }
 
     val currentContext = Context.getContext
-    currentContext shouldBe defined
-    currentContext shouldBe Some(oldContext)
+    currentContext shouldBe oldContext
   }
 
   it should "propagate context and restore empty context" in {
     val context = RequestContext(Random.nextLong(), Some("abc123"), FakeRequest())
     Context.withContext(context) {
       val currentContext = Context.getContext
-      currentContext shouldBe defined
-      currentContext shouldBe Some(context)
+      currentContext shouldBe context
     }
 
     val currentContext = Context.getContext
-    currentContext shouldBe empty
+    currentContext shouldBe NoContextAvailable
   }
 
   it should "propagate context and restore old context in async execution" in {
@@ -71,11 +65,9 @@ class ContextSpec extends AsyncFlatSpec with Matchers with BeforeAndAfterEach {
 
     futureContexts.map {
       case (innerContext, outerContext) =>
-        emptyContext shouldBe empty
-        innerContext shouldBe defined
-        innerContext shouldBe Some(context)
-        outerContext shouldBe defined
-        outerContext shouldBe Some(oldContext)
+        emptyContext shouldBe NoContextAvailable
+        innerContext shouldBe context
+        outerContext shouldBe oldContext
     }
   }
 
@@ -92,7 +84,7 @@ class ContextSpec extends AsyncFlatSpec with Matchers with BeforeAndAfterEach {
   }
 
   override def beforeEach(): Unit = {
-    Context.clear()
+    Context.setContext(NoContextAvailable)
   }
 
 }

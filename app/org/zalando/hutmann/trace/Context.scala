@@ -88,39 +88,23 @@ case class JobContext(
 
 object Context {
   self =>
-  private val context = new ThreadLocal[Context]()
+  private val context = new ThreadLocal[Context]() {
+    override def initialValue(): Context = NoContextAvailable
+  }
 
-  def getContext: Option[Context] = {
-    Option(context.get())
+  def getContext: Context = {
+    context.get()
   }
 
   def setContext(ctx: Context): Unit = {
+    assert(ctx.isInstanceOf[Context], "context can't be null")
     context.set(ctx)
-    setMdcContext(ctx)
-  }
-
-  def clear(): Unit = {
-    context.remove()
-    removeMdcContext()
-  }
-
-  private def setMdcContext(context: Context): Unit = {
-    context match {
+    ctx match {
       case FlowIdAware(flowId) =>
         MDC.put(FlowIdHeader, flowId)
+      case NoContextAvailable =>
+        MDC.remove(FlowIdHeader)
       case _ =>
-    }
-  }
-
-  private def removeMdcContext(): Unit = {
-    MDC.remove(FlowIdHeader)
-  }
-
-  def capture(): CapturedContext = new CapturedContext {
-    val maybeContext = getContext
-    def withContext[T](block: => T): T = maybeContext match {
-      case Some(ctx) => self.withContext(ctx)(block)
-      case None      => block
     }
   }
 
@@ -128,15 +112,12 @@ object Context {
     * Execute the given block with the given context.
     */
   def withContext[T](ctx: Context)(block: => T): T = {
-    val maybeOld = getContext
+    val oldContext = getContext
     try {
       setContext(ctx)
       block
     } finally {
-      maybeOld match {
-        case Some(old) => setContext(old)
-        case None      => clear()
-      }
+      setContext(oldContext)
     }
   }
 
@@ -152,12 +133,4 @@ object Context {
     */
   implicit def request2loggingContext[A](request: RequestHeader): RequestContext =
     RequestContext(requestId = request.id, flowId = request.headers.get(FlowIdHeader), requestHeader = request)
-}
-
-trait CapturedContext {
-
-  /**
-    * Execute the given block with the captured context.
-    */
-  def withContext[T](block: => T): T
 }
