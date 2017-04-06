@@ -10,6 +10,7 @@ import java.util.{ Base64, UUID }
 import akka.stream.Materializer
 import com.google.inject.Inject
 import FlowIdFilter.FlowIdHeader
+import org.zalando.hutmann.trace.Context
 /**
   * A flow id filter that checks flow ids and can add them if they are not present, as well as copy them to the output
   * if needed.
@@ -18,28 +19,32 @@ import FlowIdFilter.FlowIdHeader
   *                 <li> Create -> creates a new flow-id if the header doesn't contain one</li></ul>
   * @param copyFlowIdToResult If the flow-id should be copied from the input to the output headers.
   */
+
 sealed abstract class FlowIdFilter(
     behavior:           FlowIdBehavior,
     copyFlowIdToResult: Boolean
 )(implicit val mat: Materializer) extends Filter {
 
   override def apply(nextFilter: (RequestHeader) => Future[Result])(rh: RequestHeader): Future[Result] = {
-    val (filtered, optFlowId) = rh.headers.get(FlowIdHeader) match {
-      case Some(id) =>
-        (nextFilter(rh), Some(id))
+
+    val optFlowId = rh.headers.get(FlowIdHeader).orElse(behavior match {
+      case Create => Some(createFlowId)
+      case Strict => None
+    })
+
+    optFlowId match {
       case None =>
-        behavior match {
-          case Create =>
-            val flowId = createFlowId
-            val newRh = rh.copy(headers = rh.headers.add(FlowIdHeader -> flowId))
-            (nextFilter(newRh), Some(flowId))
-          case Strict => (Future.successful(BadRequest("Missing flow id header")), None)
+        Future.successful(BadRequest("Missing flow id header"))
+      case Some(flowId) =>
+        val headers = rh.copy(headers = rh.headers.add(FlowIdHeader -> flowId))
+        val ctx = Context.request2loggingContext(headers)
+        Context.withContext(ctx) {
+          if (copyFlowIdToResult) {
+            nextFilter(ctx.requestHeader).map(_.withHeaders(FlowIdHeader -> flowId))
+          } else {
+            nextFilter(ctx.requestHeader)
+          }
         }
-    }
-    if (copyFlowIdToResult) {
-      optFlowId.fold(filtered)(flowId => filtered.map(_.withHeaders(FlowIdHeader -> flowId)))
-    } else {
-      filtered
     }
   }
 

@@ -1,10 +1,10 @@
-package org.zalando.hutmann.logging
+package org.zalando.hutmann.trace
 
 import java.time.ZonedDateTime
 
-import org.zalando.hutmann.authentication.{ AuthorizationProblem, NoAuthorization, User, UserRequest }
+import org.slf4j.MDC
 import org.zalando.hutmann.filters.FlowIdFilter.FlowIdHeader
-import play.api.mvc.{ Request, RequestHeader }
+import play.api.mvc.RequestHeader
 
 import scala.language.implicitConversions
 
@@ -53,14 +53,12 @@ object FlowIdAware {
   * @param requestId     The play request id that is unique for a request.
   * @param flowId        The flow id that is used to identify a flow over system boundaries.
   * @param requestHeader The request headers the request has. The request body is not forwarded here since you should do that explicitly if you need it.
-  * @param user          The user that issued the request (if any).
   */
 case class RequestContext(
     requestId:              Long,
     override val flowId:    Option[String],
     requestHeader:          RequestHeader,
-    user:                   Either[AuthorizationProblem, User],
-    override val extraInfo: Map[String, String]                = Map.empty
+    override val extraInfo: Map[String, String] = Map.empty
 ) extends Context with FlowIdAware {
   override def updated(key: String, value: String): RequestContext = this.copy(extraInfo = extraInfo.updated(key, value))
 }
@@ -89,30 +87,39 @@ case class JobContext(
 }
 
 object Context {
-  /**
-    * Implicit conversion to allow easy creation of {{{Context}}}. Usage:
-    *
-    * {{{
-    * implicit val context: ContextInformation = request
-    * }}}
-    *
-    * @param request The play request object that should be used to extract information.
-    * @tparam A      The type of the body of the request.
-    */
-  implicit def request2loggingContext[A](request: UserRequest[A]): RequestContext = request.context
+  self =>
+  private val context = new ThreadLocal[Context]() {
+    override def initialValue(): Context = NoContextAvailable
+  }
+
+  def getContext: Context = {
+    context.get()
+  }
+
+  def setContext(ctx: Context): Unit = {
+    assert(ctx.isInstanceOf[Context], "context can't be null")
+    context.set(ctx)
+    ctx match {
+      case FlowIdAware(flowId) =>
+        MDC.put(FlowIdHeader, flowId)
+      case NoContextAvailable =>
+        MDC.remove(FlowIdHeader)
+      case _ =>
+    }
+  }
 
   /**
-    * Implicit conversion to allow easy creation of {{{Context}}}. Usage:
-    *
-    * {{{
-    * implicit val context: ContextInformation = request
-    * }}}
-    *
-    * @param request The play request object that should be used to extract information.
-    * @tparam A      The type of the body of the request.
+    * Execute the given block with the given context.
     */
-  implicit def request2loggingContext[A](request: Request[A]): RequestContext =
-    RequestContext(requestId = request.id, flowId = request.headers.get(FlowIdHeader), requestHeader = request, user = Left(NoAuthorization))
+  def withContext[T](ctx: Context)(block: => T): T = {
+    val oldContext = getContext
+    try {
+      setContext(ctx)
+      block
+    } finally {
+      setContext(oldContext)
+    }
+  }
 
   /**
     * Implicit conversion to allow easy creation of {{{Context}}}. Usage:
@@ -125,5 +132,5 @@ object Context {
     * @tparam A      The type of the body of the request.
     */
   implicit def request2loggingContext[A](request: RequestHeader): RequestContext =
-    RequestContext(requestId = request.id, flowId = request.headers.get(FlowIdHeader), requestHeader = request, user = Left(NoAuthorization))
+    RequestContext(requestId = request.id, flowId = request.headers.get(FlowIdHeader), requestHeader = request)
 }

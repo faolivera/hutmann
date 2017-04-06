@@ -6,7 +6,8 @@ import akka.stream.Materializer
 import akka.stream.scaladsl.Flow
 import akka.util.ByteString
 import com.typesafe.config.Config
-import org.zalando.hutmann.logging.{ Context, Logger, RequestContext }
+import org.zalando.hutmann.logging.Logger
+import org.zalando.hutmann.trace.{ Context, RequestContext }
 import play.api.Configuration
 import play.api.http.{ HeaderNames, MimeTypes, Status }
 import play.api.libs.streams.Accumulator
@@ -160,7 +161,6 @@ class OAuth2Action(
 
   override def invokeBlock[A](request: Request[A], block: (UserRequest[A]) => Future[Result]): Future[Result] = {
     authenticate(request).flatMap { user =>
-      implicit val context: RequestContext = request
       val userRequest = new UserRequest[A](user, request)
       if (autoReject) {
         autoRejectBehaviour(userRequest.user, block(userRequest))
@@ -176,7 +176,7 @@ class OAuth2Action(
         authenticate(requestHeader).map { user =>
 
           lazy val accumulator = Action.async[A](bodyParser) { request =>
-            val userRequest = new UserRequest[A](user, request)(request)
+            val userRequest = new UserRequest[A](user, request)
             block(userRequest)
           }(requestHeader)
 

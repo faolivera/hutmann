@@ -48,6 +48,25 @@ import scala.concurrent.ExecutionContext.Implicits.global
   }
 ```
 
+or use(recommended) [EssentialAction](https://www.playframework.com/documentation/2.5.x/ScalaEssentialAction) to authenticate request first and then proceed with everything else like request body parsing etc.
+side effects of not using EssentialAction is explained in detail in this [issue](https://github.com/zalando-incubator/hutmann/issues/8)
+
+```tut:silent
+ import scala.concurrent.ExecutionContext
+ import play.api.libs.ws.WSClient
+ import play.api.Configuration
+ import scala.util.Future
+
+ //these come from the application normally
+ implicit val ws: WSClient = null
+ implicit val config: Configuration = null
+ import scala.concurrent.ExecutionContext.Implicits.global
+
+ def heartbeat = OAuth2Action()(implicitly[ExecutionContext], implicitly[WSClient], implicitly[Configuration]).essentialAction(parse.default) {
+     Future.successful(Ok("<3"))
+ }
+```
+
 and it automatically makes sure that requests to that route have a valid authentication token - although most probably,
 you won't make your heartbeat endpoint secured.
 
@@ -59,13 +78,13 @@ tell something about the other frameworks etc
 
 ## Perquisites and dependencies
 
-The library currently only works with Play 2.4. It depends on its JSON and WS libraries, which your project must bring.
+The library currently works with Play 2.4.x, 2.5.x+. It depends on its JSON and WS libraries, which your project must bring.
 
 ## Getting it
 
 Versioning follows the Play version number it works with. 2.4.x therefore is a version that works with Play 2.4, 2.5.x (if any) works with Play 2.5.
 
-```scala
+```tut:silent
 libraryDependencies += "org.zalando" %% "hutmann" % "2.5.1"
 ```
 
@@ -101,26 +120,6 @@ def heartbeat = OAuth2Action(isEmployee)(implicitly[ExecutionContext], implicitl
   Ok("<3")
 }
 ```
-
-or use(recommended) [EssentialAction](https://www.playframework.com/documentation/2.5.x/ScalaEssentialAction) to authenticate request first and then proceed with everything else like request body parsing etc.
-side effects of not using EssentialAction is explained in detail in this [issue](https://github.com/zalando-incubator/hutmann/issues/8)
-
-```tut:silent
-import scala.concurrent.ExecutionContext
-import play.api.libs.ws.WSClient
-import play.api.Configuration
-import scala.util.Future
-
-//these come from the application normally
-implicit val ws: WSClient = null
-implicit val config: Configuration = null
-import scala.concurrent.ExecutionContext.Implicits.global
-
-def heartbeat = OAuth2Action()(implicitly[ExecutionContext], implicitly[WSClient], implicitly[Configuration]).essentialAction(parse.default) { 
-    Future.successful(Ok("<3"))
-}
-```
-
 
 will check if the token is from realm "/employees" and has a scope "uid" property set.
 
@@ -194,6 +193,37 @@ This flow id shall additionally be added to all log entries of your services. Th
 The `FlowIdFilter` inspects the requests that come in if they have a flow id and - depending on the configuration - either adds one if it there is none,
  or rejects the request.
 
+It also sets the **Flow Id** value in the SLF4J MDC, so that it can be used in the logs just adding ```X{X-Flow-ID}``` to the log pattern in yout logback.xml file.
+
+
+#### How to use it
+
+The FlowIdFilter works capturing the request in a thread local, making it available to any code executed by the Play default execution context. In order to make it works you need to configure the akka dispatcher as following:
+
+```
+akka {
+  actor {
+    default-dispatcher {
+      type: org.zalando.hutmann.dispatchers.ContextPropagatingDispatcherConfigurator
+    }
+  }
+}
+```
+
+In to your filters file:
+```tut:silent
+import javax.inject.Inject
+import play.api.http.DefaultHttpFilters
+import play.filters.gzip.GzipFilter
+
+class Filters @Inject() (
+  flowIdFilter: FlowIdFilter,
+  /*...your other filters ... */
+) extends DefaultHttpFilters(flowIdFilter, /*...*/)
+
+```
+And bind the FlowIdFilter to `CreateFlowIdFilter` or `StrictFlowIdFilter`
+
 ## More logging
 
 You can use the integrated logger in your projects as well, and benefit from the automatic context evaluation that will take care that you
@@ -209,25 +239,19 @@ object MyController extends Controller {
   }
 
   def createSession: Action[JsValue] = OAuth2Action()(implicitly[ExecutionContext], implicitly[WSClient], implicitly[Configuration])(parse.tolerantJson) { request =>
-    implicit val context: Context = request //there is an implicit conversion for the request
     doSomething
     Logger.info("some message")
     Created
   }
 }
 ```
-```tut:invisible
-import play.api.test._
-import play.api._
-val app = FakeApplication()
-Play.start(app)
-```
+
+
 ```tut:silent
 MyController.createSession(FakeRequest().withJsonBody(Json.obj()))
 ```
-```tut:invisible
-Play.stop(app)
-```
+
+
 ```
 09:52:00.578 [pool-1-thread-1-ScalaTest-running-LoggerDemo] WARN application - watch out! - 1ms/TheSourceFile.scala:15/THEFLOWID
 09:52:00.578 [pool-1-thread-1-ScalaTest-running-LoggerDemo] INFO application - some message - 1ms/TheSourceFile.scala:20/THEFLOWID
