@@ -205,6 +205,9 @@ akka {
   actor {
     default-dispatcher {
       type: org.zalando.hutmann.dispatchers.ContextPropagatingDispatcherConfigurator
+    }
+  }
+}
 ```
 
 In to your filters file:
